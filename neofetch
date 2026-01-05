@@ -2213,6 +2213,140 @@ get_cpu() {
                 ;;
             esac
 
+            if [[ -z "$cpu" ]] && command -v lscpu &> /dev/null; then
+                lscpu_output=$(lscpu)
+                model_lines=$(echo "$lscpu_output" | grep -n "Model name:" | grep -v "BIOS Model name")
+                
+                if [ -n "$model_lines" ]; then
+                    model_line_nums=$(echo "$model_lines" | cut -d: -f1)
+                    model_count=$(echo "$model_line_nums" | wc -l)
+
+                    declare -A model_names
+                    declare -A model_cores_info
+                    declare -A model_threads_info
+                    declare -A model_sockets_info
+                    declare -A model_freq_info
+
+                    IFS=$'\n' read -d '' -ra lscpu_lines <<< "$lscpu_output"
+                    last_model_start=0
+                    model_index=0
+
+                    for line_num in $model_line_nums; do
+                        model_line="${lscpu_lines[$((line_num-1))]}"
+                        model_name=$(echo "$model_line" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+                        model_start=$line_num
+                        if [ -n "$next_model_start" ]; then
+                            model_end=$((next_model_start-1))
+                        else
+                             model_end=${#lscpu_lines[@]}
+                        fi
+
+                        model_block=""
+                        for ((i=model_start-1; i<model_end; i++)); do
+                            model_block+="${lscpu_lines[$i]}"$'\n'
+                        done
+
+                        block_cores=$(echo "$model_block" | grep "Core(s) per socket" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_threads=$(echo "$model_block" | grep "Thread(s) per core" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_cluster_cores=$(echo "$model_block" | grep "Core(s) per cluster" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_sockets=$(echo "$model_block" | grep "Socket(s)" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_clusters=$(echo "$model_block" | grep "Cluster(s)" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_freq=$(echo "$model_block" | grep "CPU max MHz" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+                        model_names[$model_index]="$model_name"
+                        model_cores_info[$model_index]="${block_cluster_cores:-$block_cores}"
+                        model_threads_info[$model_index]="$block_threads"
+                        model_sockets_info[$model_index]="${block_clusters:-$block_sockets}"
+                        model_freq_info[$model_index]="$block_freq"
+                        model_index=$((model_index+1))
+                    done
+
+                    for ((i=0; i<model_index; i++)); do
+                        model_name="${model_names[$i]}"
+                        model_cores="${model_cores_info[$i]}"
+                        model_threads="${model_threads_info[$i]}"
+                        model_sockets="${model_sockets_info[$i]}"
+                        model_freq="${model_freq_info[$i]}"
+
+                        if [[ -n "$model_cores" ]] && [[ -n "$model_sockets" ]]; then
+                            physical_cores=$((model_cores * model_sockets))
+                        else
+                            physical_cores=""
+                        fi
+
+                        if [[ -n "$physical_cores" ]] && [[ -n "$model_threads" ]]; then
+                            logical_cores=$((physical_cores * model_threads))
+                        else
+                            logical_cores=""
+                        fi
+
+                        model_display="$model_name"
+                        model_display="${model_display//(TM)}"
+                        model_display="${model_display//(tm)}"
+                        model_display="${model_display//(R)}"
+                        model_display="${model_display//(r)}"
+                        model_display="${model_display//CPU}"
+                        model_display="${model_display//Processor}"
+                        model_display="${model_display//Dual-Core}"
+                        model_display="${model_display//Quad-Core}"
+                        model_display="${model_display//Six-Core}"
+                        model_display="${model_display//Eight-Core}"
+                        model_display="${model_display//[1-9][0-9]-Core}"
+                        model_display="${model_display//[0-9]-Core}"
+                        model_display="${model_display//, * Compute Cores}"
+                        model_display="${model_display//Core / }"
+                        model_display="${model_display//(\"AuthenticAMD\"*)}"
+                        model_display="${model_display//with Radeon * Graphics}"
+                        model_display="${model_display//, altivec supported}"
+                        model_display="${model_display//FPU*}"
+                        model_display="${model_display//Chip Revision*}"
+                        model_display="${model_display//Technologies, Inc}"
+                        model_display="${model_display//Core2/Core 2}"
+
+                        if [[ "$cpu_brand" == "off" ]]; then
+                            model_display="${model_display/AMD }"
+                            model_display="${model_display/Intel }"
+                            model_display="${model_display/Core? Duo }"
+                            model_display="${model_display/Qualcomm }"
+                            model_display="${model_display/HiSilicon }"
+                        fi
+
+                        if [[ "$cpu_cores" != "off" ]]; then
+                            if [[ "$cpu_cores" == "physical" ]] && [[ -n "$physical_cores" ]]; then
+                                model_display="$model_display ($physical_cores)"
+                            elif [[ "$cpu_cores" == "logical" ]] && [[ -n "$logical_cores" ]]; then
+                                model_display="$model_display ($logical_cores)"
+                            elif [[ "$cpu_cores" == "on" ]]; then
+                                if [[ -n "$logical_cores" ]]; then
+                                    model_display="$model_display ($logical_cores)"
+                                elif [[ -n "$physical_cores" ]]; then
+                                    model_display="$model_display ($physical_cores)"
+                                fi
+                            fi
+                        fi
+
+                        if [[ "$cpu_speed" != "off" && -n "$model_freq" ]] && [[ "$model_freq" =~ ^[0-9.]+$ ]]; then
+                            if (( $(echo "$model_freq < 1000" 2>/dev/null || echo "$model_freq < 1000") )); then
+                                model_display="$model_display @ ${model_freq}MHz"
+                            else
+                                if [[ "$speed_shorthand" == "on" ]]; then
+                                    model_freq_ghz=$(echo "$model_freq" | awk '{printf "%.1f", $1/1000}')
+                                else
+                                    model_freq_ghz=$(echo "$model_freq" | awk '{printf "%.3f", $1/1000}')
+                                fi
+                                model_display="$model_display @ ${model_freq_ghz}GHz"
+                            fi
+                        fi
+
+                        prin "${subtitle:+${subtitle}${cpu_name}}" "$model_display"
+                    done
+
+                    prin=1
+                    return
+                fi
+            fi
+
             speed_dir="/sys/devices/system/cpu/cpu0/cpufreq"
 
             # Select the right temperature file.
