@@ -63,19 +63,20 @@ print_info() {
     info "Packages" packages
     info "Shell" shell
     info "Resolution" resolution
-    info "DE" de
-    info "WM" wm
-    info "WM Theme" wm_theme
-    info "Theme" theme
-    info "Icons" icons
     info "Terminal" term
-    info "Terminal Font" term_font
     info "CPU" cpu
     info "GPU" gpu
     info "Memory" memory
+    info "NIC" nic
+    info "Disk" disk
 
+    #info "DE" de
+    #info "WM" wm
+    #info "WM Theme" wm_theme
+    #info "Theme" theme
+    #info "Icons" icons
+    #info "Terminal Font" term_font
     # info "GPU Driver" gpu_driver  # Linux/macOS only
-    # info "Disk" disk
     # info "Battery" battery
     # info "Font" font
     # info "Song" song
@@ -160,14 +161,14 @@ uptime_shorthand="on"
 
 # Show memory percentage in output.
 #
-# Default: 'off'
+# Default: 'on'
 # Values:  'on', 'off'
 # Flag:    --memory_percent
 #
 # Example:
 # on:   '1801MiB / 7881MiB (22%)'
 # off:  '1801MiB / 7881MiB'
-memory_percent="off"
+memory_percent="on"
 
 # Change memory output unit.
 #
@@ -203,14 +204,14 @@ package_managers="on"
 
 # Show the path to $SHELL
 #
-# Default: 'off'
+# Default: 'on'
 # Values:  'on', 'off'
 # Flag:    --shell_path
 #
 # Example:
 # on:  '/bin/bash'
 # off: 'bash'
-shell_path="off"
+shell_path="on"
 
 # Show $SHELL version
 #
@@ -341,7 +342,7 @@ gpu_type="all"
 
 
 # Display refresh rate next to each monitor
-# Default: 'off'
+# Default: 'on'
 # Values:  'on', 'off'
 # Flag:    --refresh_rate
 # Supports: Doesn't work on Windows.
@@ -349,7 +350,7 @@ gpu_type="all"
 # Example:
 # on:  '1920x1080 @ 60Hz'
 # off: '1920x1080'
-refresh_rate="off"
+refresh_rate="on"
 
 
 # Gtk Theme / Icons / Font
@@ -2956,6 +2957,57 @@ get_memory() {
         "bar")     memory="$(bar "${mem_used}" "${mem_total}")" ;;
         "infobar") memory="${memory} $(bar "${mem_used}" "${mem_total}")" ;;
         "barinfo") memory="$(bar "${mem_used}" "${mem_total}")${info_color} ${memory}" ;;
+    esac
+}
+
+get_nic() {
+    case $os in
+        "Linux")
+            # Read NICs into array.
+            nic_cmd="$(lspci -mm |
+                       awk -F '\"|\" \"|\\(' \
+                              '/"Ethernet controller|"Network controller/ {
+                                  a[$0] = $1 " " $3 " " ($(NF-1) ~ /^$|^Device [[:xdigit:]]+$/ ? $4 : $(NF-1))
+                              }
+                              END { for (i in a) {
+                                  if (!seen[a[i]]++) {
+                                      sub("^[^ ]+ ", "", a[i]);
+                                      print a[i]
+                                  }
+                              }}' | sort -u)"
+            IFS=$'\n' read -d "" -ra nics <<< "$nic_cmd"
+
+            for nic in "${nics[@]}"; do
+                nic="${nic/Advanced Micro Devices, Inc. \[}"
+                nic="${nic/\/ATI\]}"
+                nic="${nic/, Corp.}"
+                nic="${nic/Corp.}"
+                nic="${nic/Corporation}"
+                nic="${nic/Co., Ltd.}"
+                nic="${nic/Technologies}"
+                nic="${nic/Inc. and subsidiaries}"
+                nic="${nic/, Inc.}"
+                nic="${nic/®}"
+                nic="${nic/\(R\)}"
+                nic="${nic/Semiconductor}"
+                nic="${nic/ \(*}"
+                nic=$(echo "$nic" | awk '{
+                    if (NF >= 2 && $1 == $2) {
+                        printf "%s", $1
+                        for (i=3; i<=NF; i++) {
+                            printf " %s", $i
+                        }
+                        print ""
+                    } else {
+                        print $0
+                    }
+                }')
+
+                prin "${subtitle:+${subtitle}${nic_name}}" "$nic"
+            done
+
+            return
+        ;;
     esac
 }
 
@@ -5589,19 +5641,19 @@ get_args() {
                     info "Packages" packages
                     info "Shell" shell
                     info "Resolution" resolution
+                    info "Terminal" term
+                    info "CPU" cpu
+                    info "GPU" gpu
+                    info "GPU Driver" gpu_driver
+                    info "Memory" memory
+                    info "NIC" nic
+                    info "Disk" disk
                     info "DE" de
                     info "WM" wm
                     info "WM Theme" wm_theme
                     info "Theme" theme
                     info "Icons" icons
-                    info "Terminal" term
                     info "Terminal Font" term_font
-                    info "CPU" cpu
-                    info "GPU" gpu
-                    info "GPU Driver" gpu_driver
-                    info "Memory" memory
-
-                    info "Disk" disk
                     info "Battery" battery
                     info "Font" font
                     info "Song" song
