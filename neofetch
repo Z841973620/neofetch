@@ -2255,6 +2255,12 @@ get_cpu() {
                         block_clusters=$(echo "$model_block" | grep "Cluster(s)" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
                         block_freq=$(echo "$model_block" | grep "CPU max MHz" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
+                        if [[ -z "$block_freq" ]] && command -v bfcpu-freq &> /dev/null; then
+                            block_freq="$(bfcpu-freq).0000"
+                            block_freq="${block_freq/core freq = }"
+                            block_freq="${block_freq/MHz}"
+                        fi
+
                         model_names[$model_index]="$model_name"
                         model_cores_info[$model_index]="${block_cluster_cores:-$block_cores}"
                         model_threads_info[$model_index]="$block_threads"
@@ -2652,7 +2658,7 @@ get_gpu() {
 
             if [[ -z "$gpus" ]] && [ -f "/etc/nv_tegra_release" ]; then
                 gpu="$(cat /proc/device-tree/model)"
-                gpu="${gpu/NVIDIA}"
+                gpu="${gpu/NVIDIA }"
                 gpu="${gpu/Tegra124*/Tegra K1}"
                 gpu="${gpu/Jetson Nano*/Tegra X1}"
                 gpu="${gpu/TX1*/Tegra X1}"
@@ -2660,7 +2666,7 @@ get_gpu() {
                 gpu="${gpu/lanai*/Tegra X2}"
                 gpu="${gpu/Jetson-AGX*/Xavier}"
                 gpu="${gpu/Jetson}"
-                gpu="${gpu/AGX}"
+                gpu="${gpu/AGX }"
                 gpu="${gpu/NX*}"
                 gpu="${gpu/Nano*}"
                 gpu="${gpu/Eng*}"
