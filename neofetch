@@ -2632,7 +2632,7 @@ get_gpu() {
                 IFS=$'\n' read -d "" -ra gpus <<< "$gpu_cmd"
 
                 for gpu in "${gpus[@]}"; do
-                    gpu="${gpu/\(*}"
+                    gpu="${gpu/\(*\)}"
                     prin "${subtitle:+${subtitle}${gpu_name}}" "$gpu"
                 done
             else
