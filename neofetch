@@ -2329,7 +2329,7 @@ get_cpu() {
 
             # Select the right temperature file.
             for temp_dir in /sys/class/hwmon/*; do
-                [[ "$(< "${temp_dir}/name")" =~ (cpu_thermal|coretemp|fam15h_power|k10temp) ]] && {
+                [[ "$(< "${temp_dir}/name")" =~ (cpu_thermal|coretemp|fam15h_power|k10temp|cpu_hwmon) ]] && {
                     temp_dirs=("$temp_dir"/temp*_input)
                     temp_dir=${temp_dirs[0]}
                     break
@@ -2674,6 +2674,10 @@ get_gpu() {
                             [[ -z "$(trim "$gpu")" ]] && gpu="Intel Integrated Graphics"
                         ;;
 
+                        *"ASPEED"*)
+                            gpu="${gpu/ASPEED Technology, Inc. }"
+                        ;;
+
                         *"MCST"*)
                             gpu="${gpu/*MCST*MGA2*/MCST MGA2}"
                         ;;
@@ -2684,6 +2688,10 @@ get_gpu() {
 
                         *"Matrox"*)
                             gpu="${gpu/Electronics Systems Ltd. }"
+                        ;;
+
+                        *"Loongson Technology LLC"*)
+                            gpu="${gpu/Technology LLC }"
                         ;;
 
                         *) continue ;;
@@ -2947,9 +2955,12 @@ get_nic() {
                 nic="${nic/Technologies}"
                 nic="${nic/Inc. and subsidiaries}"
                 nic="${nic/, Inc.}"
+                nic="${nic/, Inc}"
                 nic="${nic/Inc.}"
                 nic="${nic/®}"
                 nic="${nic/Semiconductor}"
+                nic="${nic/Technology LLC}"
+                nic="${nic/Microelectronics.}"
                 nic="${nic/ \(*\)}"
                 nic=$(echo "$nic" | awk '{
                     if (NF >= 2 && $1 == $2) {
