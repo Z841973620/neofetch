@@ -2179,9 +2179,9 @@ get_cpu() {
                 ;;
 
                 *)
-                    cpu="$(awk -F '\\s*: | @' \
-                            '/model name|Hardware|Processor|^cpu model|chip type|^cpu type/ {
-                            cpu=$2; if ($1 == "Hardware") exit } END { print cpu }' "$cpu_file")"
+                    cpu="$(awk -F '[ \t]*: | @' \
+					        '$1~/^[Mm]odel [Nn]ame$/||$1=="Processor"||$1=="cpu model"||$1=="chip type"||$1=="cpu type" \
+							{cpu=$2}$1=="Hardware"{cpu=$2;exit}END{print cpu}' "$cpu_file")"
                 ;;
             esac
 
