@@ -198,6 +198,12 @@ shell_version="on"
 
 # CPU
 
+# read CPU information
+#
+# Default: 'cpuinfo'
+# Values: 'cpuinfo', 'lscpu'.
+# Flag:    --read_cpu
+read_cpu="cpuinfo"
 
 # CPU speed type
 #
@@ -2181,11 +2187,11 @@ get_cpu() {
                 *)
                     cpu="$(awk -F '[ \t]*: | @' \
 					        '$1~/^[Mm]odel [Nn]ame$/||$1=="Processor"||$1=="cpu model"||$1=="chip type"||$1=="cpu type" \
-							{cpu=$2}$1=="Hardware"{cpu=$2;exit}END{print cpu}' "$cpu_file")"
+							{cpu=$2;exit} $1=="Hardware"{cpu=$2;exit}END{print cpu}' "$cpu_file")"
                 ;;
             esac
 
-            if [[ -z "$cpu" ]] && command -v lscpu &> /dev/null; then
+            if [[ "$read_cpu" == "lscpu" ]] || [[ -z "$cpu" ]] && command -v lscpu &> /dev/null; then
                 lscpu_output=$(lscpu)
                 model_lines=$(echo "$lscpu_output" | grep -n "Model name:" | grep -v "BIOS Model name")
                 
@@ -2219,17 +2225,19 @@ get_cpu() {
                             model_block+="${lscpu_lines[$i]}"$'\n'
                         done
 
-                        block_cores=$(echo "$model_block" | grep "Core(s) per socket" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                        block_threads=$(echo "$model_block" | grep "Thread(s) per core" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                        block_cluster_cores=$(echo "$model_block" | grep "Core(s) per cluster" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                        block_sockets=$(echo "$model_block" | grep "Socket(s)" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                        block_clusters=$(echo "$model_block" | grep "Cluster(s)" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                        block_freq=$(echo "$model_block" | grep "CPU max MHz" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_cores=$(echo "$model_block" | grep "Core(s) per socket" | head -n1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_threads=$(echo "$model_block" | grep "Thread(s) per core" | head -n1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_cluster_cores=$(echo "$model_block" | grep "Core(s) per cluster" | head -n1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_sockets=$(echo "$model_block" | grep "Socket(s)" | head -n1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_clusters=$(echo "$model_block" | grep "Cluster(s)" | head -n1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                        block_freq=$(echo "$model_block" | grep "CPU max MHz" | head -n1 | cut -d: -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
                         if [[ -z "$block_freq" ]] && command -v bfcpu-freq &> /dev/null; then
-                            block_freq="$(bfcpu-freq).0000"
+                            block_freq="$(bfcpu-freq)"
                             block_freq="${block_freq/core freq = }"
                             block_freq="${block_freq/MHz}"
+                            block_freq="${block_freq/ }"
+                            block_freq="${block_freq}.0000"
                         fi
 
                         model_names[$model_index]="$model_name"
@@ -2329,7 +2337,7 @@ get_cpu() {
 
             # Select the right temperature file.
             for temp_dir in /sys/class/hwmon/*; do
-                [[ "$(< "${temp_dir}/name")" =~ (cpu_thermal|coretemp|fam15h_power|k10temp|cpu_hwmon) ]] && {
+                [[ "$(< "${temp_dir}/name")" =~ (cpu_thermal|coretemp|fam15h_power|k10temp|cpu_hwmon|cluster0_thermal|acpitz) ]] && {
                     temp_dirs=("$temp_dir"/temp*_input)
                     temp_dir=${temp_dirs[0]}
                     break
@@ -5169,6 +5177,7 @@ INFO:
                                 1 GHz.
 
     --cpu_brand on/off          Enable/Disable CPU brand in output.
+    --read_cpu cpuinfo/lscpu    Choose to read CPU information using /proc/cpuinfo or lscpu.
     --cpu_cores type            Whether or not to display the number of CPU cores
                                 Possible values: logical, physical, off
 
@@ -5403,6 +5412,7 @@ get_args() {
             "--title_fqdn") title_fqdn="$2" ;;
             "--package_managers") package_managers="$2" ;;
             "--os_arch") os_arch="$2" ;;
+            "--read_cpu") read_cpu="$2" ;;
             "--cpu_cores") cpu_cores="$2" ;;
             "--cpu_speed") cpu_speed="$2" ;;
             "--speed_type") speed_type="$2" ;;
