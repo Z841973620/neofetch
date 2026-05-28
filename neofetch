@@ -2213,15 +2213,15 @@ get_cpu() {
                         model_line="${lscpu_lines[$((line_num-1))]}"
                         model_name=$(echo "$model_line" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
-                        model_start=$line_num
-                        if [ -n "$next_model_start" ]; then
-                            model_end=$((next_model_start-1))
+                        if [ "$model_count" -eq 1 ]; then
+                            model_start=4
                         else
-                             model_end=${#lscpu_lines[@]}
+                            model_start=$((line_num-1))
                         fi
 
+                        model_end=${#lscpu_lines[@]}
                         model_block=""
-                        for ((i=model_start-1; i<model_end; i++)); do
+                        for ((i=model_start; i<model_end; i++)); do
                             model_block+="${lscpu_lines[$i]}"$'\n'
                         done
 
