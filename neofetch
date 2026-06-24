@@ -284,6 +284,13 @@ cpu_temp="off"
 # GPU
 
 
+# read GPU information
+#
+# Default: 'lspci'
+# Values: 'lspci', 'vulkaninfo'.
+# Flag:    --read_gpu
+read_gpu="lspci"
+
 # Enable/Disable GPU Brand
 #
 # Default: 'on'
@@ -2635,7 +2642,7 @@ get_gpu() {
             # there's a dedicated GPU in play.
             [[ "${gpus[0]}" == *Intel* && "${gpus[1]}" == *Intel* ]] && unset -v "gpus[0]"
 
-            if [[ -z "$gpus" ]] && command -v vulkaninfo &> /dev/null; then
+            if [[ "$read_gpu" == "vulkaninfo" ]] || [[ -z "$gpus" ]] && command -v vulkaninfo &> /dev/null; then
                 gpu_cmd="$(vulkaninfo 2>/dev/null | grep deviceName | grep -v llvmpipe | sed 's/.*= //')"
                 IFS=$'\n' read -d "" -ra gpus <<< "$gpu_cmd"
 
@@ -2960,6 +2967,7 @@ get_nic() {
                 nic="${nic/Corp.}"
                 nic="${nic/Corporation}"
                 nic="${nic/Co., Ltd.}"
+                nic="${nic/Ltd}"
                 nic="${nic/Technologies}"
                 nic="${nic/Inc. and subsidiaries}"
                 nic="${nic/, Inc.}"
@@ -5202,6 +5210,7 @@ INFO:
     --uptime_shorthand on/off   Shorten the output of uptime (on, tiny, off)
     --refresh_rate on/off       Whether to display the refresh rate of each monitor
                                 Unsupported on Windows
+    --read_gpu lspci/vulkaninfo Choose to read GPU information using lspci or vulkaninfo.
     --gpu_brand on/off          Enable/Disable GPU brand in output. (AMD/NVIDIA/Intel)
     --gpu_type type             Which GPU to display. (all, dedicated, integrated)
 
@@ -5421,6 +5430,7 @@ get_args() {
             "--kernel_shorthand") kernel_shorthand="$2" ;;
             "--uptime_shorthand") uptime_shorthand="$2" ;;
             "--cpu_brand") cpu_brand="$2" ;;
+            "--read_gpu") read_gpu="$2" ;;
             "--gpu_brand") gpu_brand="$2" ;;
             "--gpu_type") gpu_type="$2" ;;
             "--refresh_rate") refresh_rate="$2" ;;
