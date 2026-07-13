@@ -2630,7 +2630,7 @@ get_gpu() {
     case $os in
         "Linux")
             # Read GPUs into array.
-            gpu_cmd="$(lspci -mm | awk -F '\"|\" \"|\\(' '/"Display|"3D|"VGA/ {a[$0] = $3 " " $4} END {for(i in a) print a[i]}')"
+            gpu_cmd="$(lspci -vmm | awk -v RS='' -F'\n' '/Class:.*(Display|3D|VGA)/ {for(i=1;i<=NF;i++){if($i~/^Vendor:/) v=substr($i,index($i,":")+2); if($i~/^Device:/) d=substr($i,index($i,":")+2); if($i~/^SDevice:/) s=substr($i,index($i,":")+2)}; print v " " ((s && index(s,"[")) ? s : d)}')"
             IFS=$'\n' read -d "" -ra gpus <<< "$gpu_cmd"
 
             # Remove duplicate Intel Graphics outputs.
@@ -2695,6 +2695,10 @@ get_gpu() {
 
                         *"MCST"*)
                             gpu="${gpu/*MCST*MGA2*/MCST MGA2}"
+                        ;;
+
+                        *"Microsoft"*)
+                            gpu="${gpu/Corporation}"
                         ;;
 
                         *"VirtualBox"*)
